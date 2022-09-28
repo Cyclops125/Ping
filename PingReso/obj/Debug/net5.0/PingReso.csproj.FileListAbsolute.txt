@@ -22,3 +22,10 @@ G:\FPT university\OJT\Study_Backend\Project\PingReso\bin\Debug\net5.0\Microsoft.
 G:\FPT university\OJT\Study_Backend\Project\PingReso\bin\Debug\net5.0\Newtonsoft.Json.dll
 G:\FPT university\OJT\Study_Backend\Project\PingReso\obj\Debug\net5.0\PingReso.csproj.CopyComplete
 G:\FPT university\OJT\Study_Backend\Project\PingReso\bin\Debug\net5.0\appsettings.json
+G:\FPT university\OJT\Study_Backend\Project\PingReso\bin\Debug\net5.0\Grpc.Core.dll
+G:\FPT university\OJT\Study_Backend\Project\PingReso\bin\Debug\net5.0\Grpc.Core.Api.dll
+G:\FPT university\OJT\Study_Backend\Project\PingReso\bin\Debug\net5.0\runtimes\linux-arm64\native\libgrpc_csharp_ext.arm64.so
+G:\FPT university\OJT\Study_Backend\Project\PingReso\bin\Debug\net5.0\runtimes\linux-x64\native\libgrpc_csharp_ext.x64.so
+G:\FPT university\OJT\Study_Backend\Project\PingReso\bin\Debug\net5.0\runtimes\osx-x64\native\libgrpc_csharp_ext.x64.dylib
+G:\FPT university\OJT\Study_Backend\Project\PingReso\bin\Debug\net5.0\runtimes\win-x64\native\grpc_csharp_ext.x64.dll
+G:\FPT university\OJT\Study_Backend\Project\PingReso\bin\Debug\net5.0\runtimes\win-x86\native\grpc_csharp_ext.x86.dll
