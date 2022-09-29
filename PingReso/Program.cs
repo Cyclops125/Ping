@@ -1,10 +1,4 @@
-﻿using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.IO;
-using System.Net;
-using System.Net.NetworkInformation;
-using System.Threading;
+﻿using System.Threading;
 using System.Linq;
 using Newtonsoft.Json;
 using System.Collections.Generic;
@@ -13,51 +7,68 @@ using System.Net.Mail;
 using System.Reflection.Metadata;
 using Microsoft.VisualBasic;
 using System.Net.Http;
+using System.IO;
+using System;
+using System.Net.NetworkInformation;
+using PingReso;
 
 namespace PingReso
 {
-    public class Config
-    {
-        public string Domains { get; set; }
-        public string AdminEmail { get; set; }
-        public static int MaxErrorCount { get; set; } = 2;
-        
-
-    }
-
-
     public class Program
     {
+        public static AppSettings appSettings { get; set; }
 
-        static string ReadJSON()
+        public static AppSettings ReadAppSettings()
         {
             string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory
                 + @"appsettings.json");
-            return path;
+
+            using (StreamReader sr = new StreamReader(path))
+            {
+                var json = sr.ReadToEnd();
+                appSettings = JsonConvert.DeserializeObject<AppSettings>(json);
+
+            }
+            return appSettings;
         }
 
-       
+        static int SleepsAfterPingAllDomain()
+        {           
+            int sleeps = ReadAppSettings().SleepsAfterPingAllDomain;
+            return sleeps;
+        }
 
-        static void SendEmail(string email, string body)
+        static int SleepBetweenPings()
+        {            
+            int sleeps = ReadAppSettings().SleepBetweenPings;
+            return sleeps;
+        }
+
+
+        static void SendEmail(string ErrorLink, DateTime time)
         {
-            if (String.IsNullOrEmpty(email))
+            string ReceiveMail = ReadAppSettings().ReceiveEmail;
+            string SendEmail = ReadAppSettings().SendEmail;
+            string SendEmailPassword = ReadAppSettings().SendEmailPassword;
+
+            string Body = "Server down at link: ";
+
+            if (String.IsNullOrEmpty(ErrorLink))
                 return;
+
             try
             {
                 MailMessage mail = new MailMessage();
-                mail.To.Add(email);
-                //mail.From = new MailAddress("resopingsend@reso.vn");
-                mail.From = new MailAddress("trieuhchse161563@fpt.edu.vn");
-                mail.Subject = $"SERVER DOWN!";
-
-                mail.Body = body;
+                mail.To.Add(ReceiveMail);
+                mail.From = new MailAddress(SendEmail);
+                mail.Subject = "Server Down";
+                mail.Body = Body + ErrorLink + " | " + time;
 
                 mail.IsBodyHtml = true;
                 SmtpClient smtp = new SmtpClient();
                 smtp.Host = "smtp.gmail.com"; //Or Your SMTP Server Address
                 smtp.UseDefaultCredentials = false;
-                //smtp.Credentials = new System.Net.NetworkCredential("resopingsend@reso.vn", "Beanoi1234"); // use valid credentials
-                smtp.Credentials = new System.Net.NetworkCredential("trieuhchse161563@fpt.edu.vn", "0775711152haitrieu");
+                smtp.Credentials = new System.Net.NetworkCredential(SendEmail, SendEmailPassword);
                 smtp.Port = 587;
 
                 //Or your Smtp Email ID and Password
@@ -94,87 +105,80 @@ namespace PingReso
                     sw.WriteLine();
                 }
             }
-
-
         }
 
-        static void Main(string[] args)
+        static void Ping()
         {
 
             Ping p = new Ping();
             bool check = true;
-            string URL = "";
-
+            int MaxErrorCount = ReadAppSettings().MaxErrorCount;
 
             //Read Json file
-            string path = ReadJSON();
-            using (StreamReader sr = new StreamReader(path))
+            string domains = ReadAppSettings().Domains;       
+            string[] convertArrayToSplit = domains.Split(",");//Convert to array to split
+            List<string> domain = new List<string>(convertArrayToSplit);//Convert to list     
+            Dictionary<string, int> DomainHashmap = domain.Distinct().ToDictionary(x => x, x => 0);//Convert to hashmap
+
+            List<string> ErrorList = new List<string>();//list of error server
+            for (; ; )
             {
-
-                var json = sr.ReadToEnd();
-                var config = JsonConvert.DeserializeObject<Config>(json);
-                string[] convertArrayToSplit = config.Domains.Split(",");//Convert to array to split
-                List<string> domain = new List<string>(convertArrayToSplit);//Convert to list     
-                Dictionary<string, int> DomainHashmap = domain.Distinct().ToDictionary(x => x, x => 0);//Convert to hashmap
-
-                List<string> ErrorList = new List<string>();//list of error server
-                for (; ; )
+                foreach (var domainItem in DomainHashmap)
                 {
-                    foreach (var domains in DomainHashmap)
-                    {                       
-                        while (check)
+                    while (check)
+                    {
+                        if (DomainHashmap[domainItem.Key] < MaxErrorCount)
                         {
-                            if (DomainHashmap[domains.Key] < Config.MaxErrorCount)
+                            try
                             {
-                                try
+                                PingReply rep = p.Send(domainItem.Key, 1000);
+                                if (rep.Status.ToString() == "Success")
                                 {
-                                    PingReply rep = p.Send(domains.Key, 1000);
-                                    if (rep.Status.ToString() == "Success")
-                                    {
-                                        Console.ForegroundColor = ConsoleColor.Cyan;
+                                    Console.ForegroundColor = ConsoleColor.Cyan;
 
-                                        Console.WriteLine("Reply from: " + rep.Address + "Bytes=" + rep.Buffer.Length + " Time=" +
-                                            rep.RoundtripTime + " TTL=" + rep.Options.Ttl + " Routers=" + (128 - rep.Options.Ttl) + " Status=" +
-                                            rep.Status + " Server" + domains);//Print normal server
-                                        URL = domains.ToString();
-                                        Thread.Sleep(1000);
-                                    }
-                                    check = false;
-                                }
-                                catch (Exception ex)
-                                {
-                                    Console.ForegroundColor = ConsoleColor.Red;
+                                    Console.WriteLine("Reply from: " + rep.Address + "Bytes=" + rep.Buffer.Length + " Time=" +
+                                        rep.RoundtripTime + " TTL=" + rep.Options.Ttl + " Routers=" + (128 - rep.Options.Ttl) + " Status=" +
+                                        rep.Status + " Server" + domainItem);//Print normal server
 
-                                    DomainHashmap[domains.Key] = domains.Value + 1;//Error Server Count + 1
-                                    Console.WriteLine("Error:{0}, {1}", domains.Key, DomainHashmap[domains.Key]);
-                                    if (DomainHashmap[domains.Key] == Config.MaxErrorCount)
-                                    {
-                                        Console.WriteLine("Error at server: {0}", domains.Key);
-                                        ErrorList.Add(domains.Key);//add error server to list for send mail                                                                               
-                                        CreateLog(ErrorList);
-                                        
-                                        //string email = "resopingreceive@reso.vn";//receive email
-                                        string email = "minhthse161598@fpt.edu.vn";
-                                        string body = $"Error at link {domains}" + DateAndTime.Now;//error at link                                        
-                                        SendEmail(email, body);
-                                    }
-                                    Thread.Sleep(1500);
-                                    check = false;
                                 }
+                                check = false;
+                                Thread.Sleep(SleepBetweenPings());
                             }
-                            else
+                            catch (Exception ex)
                             {
+                                Console.ForegroundColor = ConsoleColor.Red;
+
+                                DomainHashmap[domainItem.Key] = domainItem.Value + 1;//Error Server Count + 1
+                                Console.WriteLine("Error:{0}, {1}", domainItem.Key, DomainHashmap[domainItem.Key]);
+                                if (DomainHashmap[domainItem.Key] == MaxErrorCount)
+                                {
+                                    Console.WriteLine("Error at server: {0}", domainItem.Key);
+                                    ErrorList.Add(domainItem.Key);//add error server to list for send mail                                                                               
+                                    CreateLog(ErrorList);
+
+                                    DateTime Time = DateAndTime.Now;
+                                    string URL = domainItem.Key; //error at link                                        
+                                    SendEmail(URL, Time);//send mail
+                                }
+                                Thread.Sleep(SleepBetweenPings());
                                 check = false;
                             }
                         }
-
-                        check = true;
+                        else
+                        {
+                            check = false;
+                        }
                     }
 
+                    check = true;
                 }
-
+                Thread.Sleep(SleepsAfterPingAllDomain());               
             }
 
+        }
+        static void Main(string[] args)
+        {          
+            Ping();
         }
     }
 }
