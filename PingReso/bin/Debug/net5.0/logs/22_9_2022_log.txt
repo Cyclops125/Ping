@@ -1,3 +1,0 @@
-Error occurs at:
-www.hekwjkrljwal
-Error: An exception occurred during a Ping request.
